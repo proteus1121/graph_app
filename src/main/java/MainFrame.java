@@ -1,4 +1,6 @@
+import com.mxgraph.analysis.mxAnalysisGraph;
 import com.mxgraph.analysis.mxGraphAnalysis;
+import com.mxgraph.analysis.mxTraversal;
 import com.mxgraph.swing.mxGraphComponent;
 import com.mxgraph.view.mxGraph;
 
@@ -7,15 +9,18 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Random;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
 class MainFrame extends JFrame
 {
 
-  private static final int COUNT_OF_ROWS = 500;
-  private static final int COUNT_OF_ELEMENTS_IN_ROW = 500;
-  private static final int ITERATION_COUNT = 500000;
+  private static final int COUNT_OF_ROWS = 10;
+  private static final int COUNT_OF_ELEMENTS_IN_ROW = 10;
+  private static final int ITERATION_COUNT = 200;
   private List<List<Object>> objects = new ArrayList<>();
+  private List<Object> edges = new ArrayList<>();
 
   MainFrame()
   {
@@ -39,67 +44,15 @@ class MainFrame extends JFrame
     try
     {
       //init 2D field
-      AtomicInteger count = new AtomicInteger();
-      int allCount = COUNT_OF_ROWS * COUNT_OF_ELEMENTS_IN_ROW;
-      for (int x = 0; x < COUNT_OF_ROWS; x++)
-      {
-        List<Object> row = new ArrayList<>();
-        objects.add(row);
-        for (int y = 0; y < COUNT_OF_ELEMENTS_IN_ROW; y++)
-        {
-          Object cell = objectFactory.createCell(graph,
-              parent,
-              String.valueOf(count.get()),
-              x * (CellFactory.WEIGHT + CellFactory.THRESHOLD),
-              y * (CellFactory.HEIGHT + CellFactory.THRESHOLD));
-          row.add(cell);
-          count.getAndIncrement();
-          System.out.println("Generate points... progress: " + count + "/" + allCount);
-        }
-      }
+      generatePoints(graph, parent, objectFactory);
 
       //rand links between objects
-      List<Thread> threads = new ArrayList<>();
-      count.set(0);
-      while (count.get() < ITERATION_COUNT)
-      {
-        Thread t = new Thread(() ->
-        {
-          Random rand = new Random();
-          int numberOfRow = rand.nextInt(COUNT_OF_ROWS);
-          int numberOfElement = rand.nextInt(COUNT_OF_ELEMENTS_IN_ROW);
-          Object intersection = objects.get(numberOfRow).get(numberOfElement);
+      generateLinks(graph, parent);
 
-          int direction = rand.nextInt(3);
-          Object neighboringIntersection = getNeighboringIntersection(numberOfRow, numberOfElement, direction);
+      //remove first dangling links
+      removeFirstDanglingLinks(graph, parent);
 
-          if (!neighboringIntersection.equals(intersection))
-          {
-            synchronized (graph)
-            {
-              graph.insertEdge(parent, null, "", intersection, neighboringIntersection, Styles.BLUE.getStyle());
-            }
-          }
-          System.out.println("Generate random edges... progress: " + count + "/" + ITERATION_COUNT);
-          count.getAndIncrement();
-        });
-        threads.add(t);
-        t.start();
-      }
-
-      threads.forEach(thread ->
-      {
-        try
-        {
-          thread.join();
-        }
-        catch (InterruptedException e)
-        {
-          e.printStackTrace();
-        }
-      });
-      threads.clear();
-
+      //find shortest path
       Object[] shortestPath = findShortestPath(graph);
       if (shortestPath.length > 0)
       {
@@ -121,6 +74,108 @@ class MainFrame extends JFrame
     getContentPane().add(graphComponent);
   }
 
+  private void removeFirstDanglingLinks(mxGraph graph, Object parent)
+  {
+    AtomicInteger count = new AtomicInteger();
+    mxAnalysisGraph mxAnalysisGraphInst = new mxAnalysisGraph();
+    mxAnalysisGraphInst.setGraph(graph);
+    List<Object> lastRowEdges = this.objects.get(objects.size() - 1).stream().map(graph::getEdges).collect(Collectors.toList());
+    edges.forEach(o ->
+    {
+      AtomicBoolean isEnded = new AtomicBoolean(false);
+      mxTraversal.bfs(mxAnalysisGraphInst, o, (vertex, edge) ->
+      {
+        boolean contains = lastRowEdges.contains(edge);
+        if(contains)
+          isEnded.set(contains);
+        return false;
+      });
+      if (!isEnded.get())
+      {
+        System.out.println("Remove first dangling links... progress: " + count + "/" + edges.size());
+        count.getAndIncrement();
+        graph.getModel().remove(o);
+      }
+
+      //      boolean isLinkDangling = lastRow.stream()
+//          .anyMatch(o1 -> mxAnalysisGraphInst.get(o, o1, false, false).length == 0);
+
+//      if (isLinkDangling)
+//      {
+//        System.out.println("Remove first dangling links... progress: " + count + "/" + edges.size());
+//        count.getAndIncrement();
+//        graph.getModel().remove(o);
+//      }
+    });
+  }
+
+  private void generateLinks(mxGraph graph, Object parent)
+  {
+    AtomicInteger count = new AtomicInteger(0);
+    List<Thread> threads = new ArrayList<>();
+    while (count.get() < ITERATION_COUNT)
+    {
+      Thread t = new Thread(() ->
+      {
+        Random rand = new Random();
+        int numberOfRow = rand.nextInt(COUNT_OF_ROWS);
+        int numberOfElement = rand.nextInt(COUNT_OF_ELEMENTS_IN_ROW);
+        Object intersection = objects.get(numberOfRow).get(numberOfElement);
+
+        int direction = rand.nextInt(3);
+        Object neighboringIntersection = getNeighboringIntersection(numberOfRow, numberOfElement, direction);
+
+        if (!neighboringIntersection.equals(intersection))
+        {
+          synchronized (graph)
+          {
+            Object edge = graph.insertEdge(parent, null, "", intersection, neighboringIntersection, Styles.BLUE.getStyle());
+            edges.add(edge);
+          }
+        }
+        System.out.println("Generate random edges... progress: " + count + "/" + ITERATION_COUNT);
+        count.getAndIncrement();
+      });
+      threads.add(t);
+      t.start();
+    }
+
+    threads.forEach(thread ->
+    {
+      try
+      {
+        thread.join();
+      }
+      catch (InterruptedException e)
+      {
+        e.printStackTrace();
+      }
+    });
+    threads.clear();
+  }
+
+  private void generatePoints(mxGraph graph, Object parent, CellFactory objectFactory)
+  {
+    AtomicInteger count = new AtomicInteger();
+    int allCount = COUNT_OF_ROWS * COUNT_OF_ELEMENTS_IN_ROW;
+    for (int x = 0; x < COUNT_OF_ROWS; x++)
+    {
+      List<Object> row = new ArrayList<>();
+      objects.add(row);
+      for (int y = 0; y < COUNT_OF_ELEMENTS_IN_ROW; y++)
+      {
+        Object cell = objectFactory.createCell(graph,
+            parent,
+            String.valueOf(count.get()),
+            x * (CellFactory.WEIGHT + CellFactory.THRESHOLD),
+            y * (CellFactory.HEIGHT + CellFactory.THRESHOLD));
+        row.add(cell);
+        count.getAndIncrement();
+        System.out.println("Generate points... progress: " + count + "/" + allCount);
+      }
+    }
+  }
+
   private Object[] findShortestPath(mxGraph graph)
   {
     final AtomicInteger count = new AtomicInteger(0);
@@ -130,11 +185,16 @@ class MainFrame extends JFrame
     final int allCount = firstRow.size() * lastRow.size();
 
 // if you want to find min path between any points, from left side to right side:
-    return firstRow.parallelStream().map(o -> lastRow.parallelStream().map(o1 ->
-    {
-      System.out.println("Try to find shortest path... progress: " + count.getAndIncrement() + " / " + allCount);
-      return analysis.getShortestPath(graph, o, o1, null, COUNT_OF_ROWS * COUNT_OF_ELEMENTS_IN_ROW, false);
-    }).filter(objects1 -> objects1.length > 0).findAny()).filter(Optional::isPresent).findFirst().orElse(Optional.of(new Object[0])).orElse(new Object[0]);
+    return firstRow.parallelStream()
+        .map(o -> lastRow.parallelStream().map(o1 ->
+        {
+          System.out.println("Try to find shortest path... progress: " + count.getAndIncrement() + " / " + allCount);
+          return analysis.getShortestPath(graph, o, o1, null, COUNT_OF_ROWS * COUNT_OF_ELEMENTS_IN_ROW, false);
+        }).filter(objects1 -> objects1.length > 0).findAny())
+        .filter(Optional::isPresent)
+        .findFirst()
+        .orElse(Optional.of(new Object[0]))
+        .orElse(new Object[0]);
 
 // if you want to find min path between points with min path in the all matrix, from left side to right side:
 //    List<List<Object>> shortestPaths = firstRow.stream().parallel().map(o -> Arrays.asList(lastRow.stream().parallel().map(o2 ->
