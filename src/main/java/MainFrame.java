@@ -1,6 +1,4 @@
-import com.mxgraph.analysis.mxAnalysisGraph;
 import com.mxgraph.analysis.mxGraphAnalysis;
-import com.mxgraph.analysis.mxTraversal;
 import com.mxgraph.model.mxCell;
 import com.mxgraph.swing.mxGraphComponent;
 import com.mxgraph.view.mxGraph;
@@ -10,7 +8,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Random;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
@@ -45,8 +42,9 @@ class MainFrame extends JFrame {
             //rand links between objects
             generateLinks(graph, parent);
 
-            //analize all links
-            analizelinks();
+            //analyze all links
+            //TODO: analyze all links after each step
+//            analyzeLinks();
 
             //remove first dangling links
             removeFirstDanglingLinks(graph, parent);
@@ -58,7 +56,7 @@ class MainFrame extends JFrame {
             } else {
                 System.out.println("None path found!");
             }
-            graph.setCellStyle(Styles.GREEN.getStyle(), shortestPath);
+//            graph.setCellStyle(Styles.GREEN.getStyle(), shortestPath);
 
         } finally {
             graph.getModel().endUpdate();
@@ -68,21 +66,31 @@ class MainFrame extends JFrame {
         getContentPane().add(graphComponent);
     }
 
-    private void analizelinks() {
-        List<EdgeDecorator> edgeOfNearIntersection = edges.stream().filter(edgeDecorator -> edgeDecorator.getSource().equals(intersection) || edgeDecorator.getTarget().equals(intersection)
-                || edgeDecorator.getSource().equals(neighboringIntersection) || edgeDecorator.getTarget().equals(neighboringIntersection)).collect(Collectors.toList());
-        if (!isEntry) {
-            isEntry = edgeOfNearIntersection.stream()
-                    .anyMatch(EdgeDecorator::isEntry);
-        }
-        if (!isExit) {
-            isExit = edgeOfNearIntersection.stream()
-                    .anyMatch(EdgeDecorator::isExit);
-        }
+    private void analyzeLinks() {
+        List<Object> firstRow = this.objects.get(0);
+        List<Object> lastRow = this.objects.get(objects.size() - 1);
+
+        List<EdgeDecorator> edgeOfFirstRow = edges.stream()
+                .filter(edgeDecorator -> firstRow.contains(edgeDecorator.getSource()) || firstRow.contains(edgeDecorator.getTarget()))
+                .collect(Collectors.toList());
+
+        List<EdgeDecorator> edgeOfLastRow = edges.stream()
+                .filter(edgeDecorator -> lastRow.contains(edgeDecorator.getSource()) || lastRow.contains(edgeDecorator.getTarget()))
+                .collect(Collectors.toList());
+
+//        if (!isEntry) {
+//            isEntry = edgeOfFirstRow.stream()
+//                    .anyMatch(EdgeDecorator::isEntry);
+//        }
+//        if (!isExit) {
+//            isExit = edgeOfFirstRow.stream()
+//                    .anyMatch(EdgeDecorator::isExit);
+//        }
     }
 
     private void removeFirstDanglingLinks(mxGraph graph, Object parent) {
         List<mxCell> collect = edges.parallelStream().filter(edgeDecorator -> !edgeDecorator.isEntry() && !edgeDecorator.isExit()).map(EdgeDecorator::getEdge).collect(Collectors.toList());
+//        edges.removeAll(collect);
         collect.forEach(edge -> edge.setStyle(Styles.RED.getStyle()));
 
 //        AtomicInteger count = new AtomicInteger();
@@ -122,8 +130,8 @@ class MainFrame extends JFrame {
         List<Thread> threads = new ArrayList<>();
         iterationCount = (COUNT_OF_ROWS - 1) * COUNT_OF_ELEMENTS_IN_ROW + (COUNT_OF_ELEMENTS_IN_ROW - 1) * COUNT_OF_ROWS;
         while (count.get() < iterationCount) {
-            Thread t = new Thread(() ->
-            {
+//            Thread t = new Thread(() ->
+//            {
                 Random rand = new Random();
                 int numberOfRow = rand.nextInt(COUNT_OF_ROWS);
                 int numberOfElement = rand.nextInt(COUNT_OF_ELEMENTS_IN_ROW);
@@ -136,17 +144,16 @@ class MainFrame extends JFrame {
 
                 if (!neighboringIntersection.equals(intersection)) {
                     synchronized (edges) {
-                        EdgeDecorator edge = EdgeUtilFactory.createEdge(graph, parent, intersection, neighboringIntersection, firstRow.contains(intersection) || firstRow.contains(neighboringIntersection), lastRow.contains(intersection) || lastRow.contains(neighboringIntersection), edges
-                        );
+                        EdgeDecorator edge = EdgeUtilFactory.createEdge(graph, parent, intersection, neighboringIntersection, firstRow, lastRow, edges);
                         edges.add(edge);
                         if (edge.isExit() && edge.isEntry()) {
                             count.set(iterationCount);
                         }
                     }
                 }
-            });
-            threads.add(t);
-            t.start();
+//            });
+//            threads.add(t);
+//            t.start();
             System.out.println("Generate random edges... progress: " + count.get() + "/" + iterationCount);
             count.getAndIncrement();
         }
