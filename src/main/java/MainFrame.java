@@ -13,9 +13,8 @@ import java.util.stream.Collectors;
 
 class MainFrame extends JFrame {
 
-    private static final int COUNT_OF_ROWS = 10;
-    private static final int COUNT_OF_ELEMENTS_IN_ROW = 10;
-    private static int iterationCount = 0;
+    private static final int COUNT_OF_ROWS = 5;
+    private static final int COUNT_OF_ELEMENTS_IN_ROW = 5;
     private List<List<Object>> objects = new ArrayList<>();
     private final List<EdgeDecorator> edges = new ArrayList<>();
 
@@ -128,7 +127,7 @@ class MainFrame extends JFrame {
     private void generateLinks(mxGraph graph, Object parent) {
         AtomicInteger count = new AtomicInteger(0);
         List<Thread> threads = new ArrayList<>();
-        iterationCount = (COUNT_OF_ROWS - 1) * COUNT_OF_ELEMENTS_IN_ROW + (COUNT_OF_ELEMENTS_IN_ROW - 1) * COUNT_OF_ROWS;
+        int iterationCount = (COUNT_OF_ROWS - 1) * COUNT_OF_ELEMENTS_IN_ROW + (COUNT_OF_ELEMENTS_IN_ROW - 1) * COUNT_OF_ROWS;
         while (count.get() < iterationCount) {
 //            Thread t = new Thread(() ->
 //            {
