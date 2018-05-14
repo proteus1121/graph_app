@@ -1,7 +1,6 @@
 import com.mxgraph.analysis.mxGraphAnalysis;
 import com.mxgraph.model.mxCell;
 import com.mxgraph.swing.mxGraphComponent;
-import com.mxgraph.util.mxEvent;
 import com.mxgraph.view.mxGraph;
 
 import javax.swing.*;
@@ -47,12 +46,8 @@ class MainFrame extends JFrame
       //rand links between objects
       generateLinks(graph, parent);
 
-      //analyze all links
-      //TODO: analyze all links after each step
-      analyzeLinks(graph);
-
       //remove first dangling links
-//      removeFirstDanglingLinks(graph, parent);
+      removeFirstDanglingLinks(graph);
 
       //find shortest path
       Object[] shortestPath = findShortestPath(graph);
@@ -90,29 +85,12 @@ class MainFrame extends JFrame
     });
   }
 
-  private void analyzeLinks(mxGraph graph)
+  private void removeFirstDanglingLinks(mxGraph graph)
   {
-    List<EdgeDecorator> edgeDecoratorsForDelete = edges.parallelStream().filter(edgeDecorator -> edgeDecorator.isEntry() || edgeDecorator.isExit())
+    List<EdgeDecorator> edgeDecoratorsForDelete = edges.parallelStream().filter(edgeDecorator -> !edgeDecorator.isEntry() || !edgeDecorator.isExit())
         .collect(Collectors.toList());
-    edgeDecoratorsForDelete.forEach(edge -> edge.getEdge().setStyle(Styles.GREEN.getStyle()));
-
-    edgeDecoratorsForDelete = edges.parallelStream().filter(edgeDecorator -> edgeDecorator.isEntry() && edgeDecorator.isExit())
-        .collect(Collectors.toList());
-    edgeDecoratorsForDelete.forEach(edge -> edge.getEdge().setStyle(Styles.RED.getStyle()));
-
-  }
-
-  private void removeFirstDanglingLinks(mxGraph graph, Object parent)
-  {
-    List<EdgeDecorator> edgeDecoratorsForDelete = edges.parallelStream().filter(edgeDecorator -> !edgeDecorator.isEntry() && !edgeDecorator.isExit()
-        || (graph.getEdges(edgeDecorator.getSource()).length < 2 || graph.getEdges(edgeDecorator.getTarget()).length < 2) && (!edgeDecorator.isEntry()
-        || !edgeDecorator.isExit()))
-
-        .collect(Collectors.toList());
-//    graph.removeCells(edgeDecoratorsForDelete.stream().map(EdgeDecorator::getEdge).toArray());
-//    edges.removeAll(edgeDecoratorsForDelete);
-    edgeDecoratorsForDelete.forEach(edge -> edge.getEdge().setStyle(Styles.RED.getStyle()));
-
+    graph.removeCells(edgeDecoratorsForDelete.stream().map(EdgeDecorator::getEdge).toArray());
+    edges.removeAll(edgeDecoratorsForDelete);
   }
 
   private void generateLinks(mxGraph graph, Object parent)
