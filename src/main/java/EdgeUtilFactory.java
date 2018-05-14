@@ -41,7 +41,7 @@ public class EdgeUtilFactory
   }
 
   //recursive search full path
-  private static synchronized Set<EdgeDecorator> getFullLine(Object intersection, Object neighboringIntersection, List<EdgeDecorator> edges,
+  public static synchronized Set<EdgeDecorator> getFullLine(Object intersection, Object neighboringIntersection, List<EdgeDecorator> edges,
       Set<EdgeDecorator> resultEdges)
   {
     Set<EdgeDecorator> newResult = new HashSet<>(resultEdges);
