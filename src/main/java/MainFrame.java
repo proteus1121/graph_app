@@ -13,7 +13,6 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.Random;
 import java.util.Set;
@@ -116,18 +115,40 @@ class MainFrame extends JFrame
     //analyze path from each element in shortestPath to start or end
     List<Object> shortestPathNodes = shortestPath.stream().flatMap(edgeDecorator -> Sets.newHashSet(edgeDecorator.getSource()
         , edgeDecorator.getTarget()).stream()).collect(Collectors.toList());
+
+    List<EdgeDecorator> allEdgesWithoutShortestPath = new ArrayList<>(edges);
+    allEdgesWithoutShortestPath.removeAll(shortestPath);
+
     shortestPath.forEach(eg ->
     {
-      Set<EdgeDecorator> resultSet = new HashSet<>();
-      List<EdgeDecorator> allEdgesWithoutShortestPath = new ArrayList<>(edges);
-      allEdgesWithoutShortestPath.removeAll(shortestPath);
-      Set<EdgeDecorator> rs = EdgeUtilFactory.getFullLine(eg.getSource(), eg.getTarget(), allEdgesWithoutShortestPath, resultSet);
-      long b = rs.stream()
-          .filter(edgeDecorator -> shortestPathNodes.contains(edgeDecorator.getSource()) ||
-              shortestPathNodes.contains(edgeDecorator.getTarget())).count();
-      if(b < 2)
-      rs.forEach(edge -> edge.getEdge().setStyle(Styles.RED.getStyle()));
+      recursiveSearchRedundantLinks(shortestPathNodes, allEdgesWithoutShortestPath, eg);
     });
+  }
+
+  private void recursiveSearchRedundantLinks(List<Object> shortestPathNodes, List<EdgeDecorator> allEdgesWithoutShortestPath, EdgeDecorator eg)
+  {
+    Set<EdgeDecorator> resultSet = new HashSet<>();
+
+    Set<EdgeDecorator> rs = Sets.union(EdgeUtilFactory.getFullLine(eg.getSource(), eg.getTarget(), allEdgesWithoutShortestPath, resultSet)
+        , EdgeUtilFactory.getFullLine(eg.getTarget(), eg.getSource(), allEdgesWithoutShortestPath, resultSet));
+
+    boolean b = rs.stream()
+        .anyMatch(edgeDecorator -> shortestPathNodes.contains(edgeDecorator.getSource()) ||
+            shortestPathNodes.contains(edgeDecorator.getTarget()));
+    if(!b && rs.size() == 1)
+    {
+      rs.forEach(edge -> edge.getEdge().setStyle(Styles.RED.getStyle()));
+    }
+    else
+    if(b && rs.size() == 1)
+    {
+      rs.forEach(edge -> edge.getEdge().setStyle(Styles.BLUE.getStyle()));
+    }
+    else if(rs.size() > 2) {
+      rs.forEach(edgeDecorator -> {
+        allEdgesWithoutShortestPath.remove(edgeDecorator);
+        recursiveSearchRedundantLinks(shortestPathNodes, allEdgesWithoutShortestPath, edgeDecorator);});
+    }
   }
 
   private void generateLinks(mxGraph graph, Object parent, List<Object> firstRow, List<Object> lastRow)
