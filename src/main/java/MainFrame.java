@@ -10,6 +10,7 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
@@ -22,8 +23,8 @@ import java.util.stream.Collectors;
 class MainFrame extends JFrame
 {
 
-  private static final int COUNT_OF_ROWS = 10;
-  private static final int COUNT_OF_ELEMENTS_IN_ROW = 10;
+  private static final int COUNT_OF_ROWS = 2;
+  private static final int COUNT_OF_ELEMENTS_IN_ROW = 2;
   private List<List<Object>> objects = new ArrayList<>();
   private final List<EdgeDecorator> edges = new ArrayList<>();
 
@@ -112,44 +113,77 @@ class MainFrame extends JFrame
 
   private void removeSecondDanglingLinks(mxGraph graph, List<EdgeDecorator> shortestPath, List<Object> firstRow, List<Object> lastRow)
   {
+
+    Boolean matrix[][] = new Boolean[COUNT_OF_ROWS * COUNT_OF_ELEMENTS_IN_ROW][COUNT_OF_ROWS * COUNT_OF_ELEMENTS_IN_ROW];
+
+    List<Object> allIntesections = objects.stream().flatMap(Collection::stream).collect(Collectors.toList());
+    for (int i = 0; i < allIntesections.size(); i++)
+    {
+      for (int y = 0; y < allIntesections.size(); y++)
+      {
+        int finalI = i;
+        int finalY = y;
+        matrix[i][y] = edges.stream()
+            .anyMatch(edgeDecorator -> edgeDecorator.getSource().equals(allIntesections.get(finalI)) || edgeDecorator.getTarget()
+                .equals(allIntesections.get(finalI)) || edgeDecorator.getSource().equals(allIntesections.get(finalY))
+                || edgeDecorator.getTarget().equals(allIntesections.get(finalY)));
+        System.out.println(matrix[i][y] + " -> " +graph.getModel().getValue(allIntesections.get(i)) + " -> " + graph.getModel().getValue(allIntesections.get(y)));
+      }
+    }
+
+//    for (int i = 0; i < allIntesections.size(); i++)
+//    {
+//      for (int y = 0; y < allIntesections.size(); y++)
+//      {
+//        System.out.print(matrix[i][y] + " ");
+//      }
+//      System.out.println(" ");
+//    }
+
     //analyze path from each element in shortestPath to start or end
-    List<Object> shortestPathNodes = shortestPath.stream().flatMap(edgeDecorator -> Sets.newHashSet(edgeDecorator.getSource()
-        , edgeDecorator.getTarget()).stream()).collect(Collectors.toList());
-
-    List<EdgeDecorator> allEdgesWithoutShortestPath = new ArrayList<>(edges);
-    allEdgesWithoutShortestPath.removeAll(shortestPath);
-
-    shortestPath.forEach(eg ->
-    {
-      recursiveSearchRedundantLinks(shortestPathNodes, allEdgesWithoutShortestPath, eg);
-    });
+//    List<Object> shortestPathNodes = shortestPath.stream()
+//        .flatMap(edgeDecorator -> Sets.newHashSet(edgeDecorator.getSource(), edgeDecorator.getTarget()).stream())
+//        .collect(Collectors.toList());
+//
+//    List<EdgeDecorator> allEdgesWithoutShortestPath = new ArrayList<>(edges);
+//    allEdgesWithoutShortestPath.removeAll(shortestPath);
+//
+//    shortestPath.forEach(eg ->
+//    {
+//      recursiveSearchRedundantLinks(graph, shortestPathNodes, allEdgesWithoutShortestPath, eg);
+//    });
   }
 
-  private void recursiveSearchRedundantLinks(List<Object> shortestPathNodes, List<EdgeDecorator> allEdgesWithoutShortestPath, EdgeDecorator eg)
-  {
-    Set<EdgeDecorator> resultSet = new HashSet<>();
-
-    Set<EdgeDecorator> rs = Sets.union(EdgeUtilFactory.getFullLine(eg.getSource(), eg.getTarget(), allEdgesWithoutShortestPath, resultSet)
-        , EdgeUtilFactory.getFullLine(eg.getTarget(), eg.getSource(), allEdgesWithoutShortestPath, resultSet));
-
-    boolean b = rs.stream()
-        .anyMatch(edgeDecorator -> shortestPathNodes.contains(edgeDecorator.getSource()) ||
-            shortestPathNodes.contains(edgeDecorator.getTarget()));
-    if(!b && rs.size() == 1)
-    {
-      rs.forEach(edge -> edge.getEdge().setStyle(Styles.RED.getStyle()));
-    }
-    else
-    if(b && rs.size() == 1)
-    {
-      rs.forEach(edge -> edge.getEdge().setStyle(Styles.BLUE.getStyle()));
-    }
-    else if(rs.size() > 2) {
-      rs.forEach(edgeDecorator -> {
-        allEdgesWithoutShortestPath.remove(edgeDecorator);
-        recursiveSearchRedundantLinks(shortestPathNodes, allEdgesWithoutShortestPath, edgeDecorator);});
-    }
-  }
+//  private void recursiveSearchRedundantLinks(mxGraph graph, List<Object> shortestPathNodes, List<EdgeDecorator> allEdgesWithoutShortestPath,
+//      EdgeDecorator eg)
+//  {
+//    Set<EdgeDecorator> resultSet = new HashSet<>();
+//
+//    Set<EdgeDecorator> rs = Sets.union(EdgeUtilFactory.getFullLine(eg.getSource(), eg.getTarget(), edges, resultSet),
+//        EdgeUtilFactory.getFullLine(eg.getTarget(), eg.getSource(), edges, resultSet));
+//
+//    boolean b = rs.stream()
+//        .anyMatch(edgeDecorator -> shortestPathNodes.contains(edgeDecorator.getSource()) || shortestPathNodes.contains(edgeDecorator.getTarget()));
+//    if (!b && rs.size() < 2)
+//    {
+////      edges.removeAll(rs);
+////      graph.removeCells(rs.toArray());
+//      rs.forEach(edge -> edge.getEdge().setStyle(Styles.RED.getStyle()));
+//    }
+////    else
+////    if(b && rs.size() == 1)
+////    {
+////      rs.forEach(edge -> edge.getEdge().setStyle(Styles.BLUE.getStyle()));
+////    }
+//    else
+//    {
+//      rs.forEach(edgeDecorator ->
+//      {
+//        edges.remove(edgeDecorator);
+//        recursiveSearchRedundantLinks(graph, shortestPathNodes, allEdgesWithoutShortestPath, edgeDecorator);
+//      });
+//    }
+//  }
 
   private void generateLinks(mxGraph graph, Object parent, List<Object> firstRow, List<Object> lastRow)
   {
