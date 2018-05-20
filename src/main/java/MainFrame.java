@@ -4,6 +4,7 @@ import com.mxgraph.analysis.mxGraphAnalysis;
 import com.mxgraph.model.mxCell;
 import com.mxgraph.swing.mxGraphComponent;
 import com.mxgraph.view.mxGraph;
+import javafx.util.Pair;
 
 import javax.swing.*;
 import java.awt.event.MouseAdapter;
@@ -23,8 +24,8 @@ import java.util.stream.Collectors;
 class MainFrame extends JFrame
 {
 
-  private static final int COUNT_OF_ROWS = 2;
-  private static final int COUNT_OF_ELEMENTS_IN_ROW = 2;
+  private static final int COUNT_OF_ROWS = 10;
+  private static final int COUNT_OF_ELEMENTS_IN_ROW = 10;
   private List<List<Object>> objects = new ArrayList<>();
   private final List<EdgeDecorator> edges = new ArrayList<>();
 
@@ -113,32 +114,66 @@ class MainFrame extends JFrame
 
   private void removeSecondDanglingLinks(mxGraph graph, List<EdgeDecorator> shortestPath, List<Object> firstRow, List<Object> lastRow)
   {
-
     Boolean matrix[][] = new Boolean[COUNT_OF_ROWS * COUNT_OF_ELEMENTS_IN_ROW][COUNT_OF_ROWS * COUNT_OF_ELEMENTS_IN_ROW];
 
-    List<Object> allIntesections = objects.stream().flatMap(Collection::stream).collect(Collectors.toList());
-    for (int i = 0; i < allIntesections.size(); i++)
+    List<Object> allIntersections = objects.stream().flatMap(Collection::stream).collect(Collectors.toList());
+    for (int i = 0; i < allIntersections.size(); i++)
     {
-      for (int y = 0; y < allIntesections.size(); y++)
+      for (int y = 0; y < allIntersections.size(); y++)
       {
         int finalI = i;
         int finalY = y;
         matrix[i][y] = edges.stream()
-            .anyMatch(edgeDecorator -> edgeDecorator.getSource().equals(allIntesections.get(finalI)) || edgeDecorator.getTarget()
-                .equals(allIntesections.get(finalI)) || edgeDecorator.getSource().equals(allIntesections.get(finalY))
-                || edgeDecorator.getTarget().equals(allIntesections.get(finalY)));
-        System.out.println(matrix[i][y] + " -> " +graph.getModel().getValue(allIntesections.get(i)) + " -> " + graph.getModel().getValue(allIntesections.get(y)));
+            .anyMatch(edgeDecorator ->
+                    edgeDecorator.getSource().equals(allIntersections.get(finalI))
+                        && edgeDecorator.getTarget().equals(allIntersections.get(finalY))
+//                    || edgeDecorator.getSource().equals(allIntersections.get(finalY))
+//                    && edgeDecorator.getTarget().equals(allIntersections.get(finalI))
+            );
+//        System.out.println(matrix[i][y] + " -> " +graph.getModel().getValue(allIntersections.get(i)) + " -> " + graph.getModel().getValue(allIntersections.get(y)));
       }
     }
+    List<Object> shortestPathNodes = shortestPath.stream().flatMap(edgeDecorator -> Sets.newHashSet(edgeDecorator.getSource()
+        , edgeDecorator.getTarget()).stream()).collect(Collectors.toList());
 
-//    for (int i = 0; i < allIntesections.size(); i++)
-//    {
-//      for (int y = 0; y < allIntesections.size(); y++)
-//      {
-//        System.out.print(matrix[i][y] + " ");
-//      }
-//      System.out.println(" ");
-//    }
+    Set<Integer> shortestPathIndexes = shortestPathNodes.stream().map(allIntersections::indexOf).collect(Collectors.toSet());
+
+    for (int i = 0; i < matrix.length; i++)
+    {
+      Set<Pair<Integer, Integer>> collected = new HashSet<>();
+      collected = recursiveAnalise(i, matrix, shortestPathIndexes, allIntersections, graph, collected);
+
+      if (!collected.isEmpty() && collected.stream()
+          .filter(integerIntegerPair -> shortestPathIndexes.contains(integerIntegerPair.getKey()) ||
+              shortestPathIndexes.contains(integerIntegerPair.getValue())).count() > 3
+          ||
+          collected.stream()
+              .anyMatch(integerIntegerPair -> (shortestPathIndexes.contains(integerIntegerPair.getKey()) &&
+                  shortestPathIndexes.contains(integerIntegerPair.getValue())))
+          )
+      {
+        if (!collected.isEmpty())
+          System.out.println("LINKED: " + collected);
+        collected.clear();
+      }
+      if (!collected.isEmpty())
+        System.out.println("DEL: " + collected);
+      List<Pair> collect = collected.stream()
+          .map(integerIntegerPair -> new Pair(allIntersections.get(integerIntegerPair.getKey()), allIntersections.get(integerIntegerPair.getValue())))
+          .collect(
+              Collectors.toList());
+
+      List<EdgeDecorator> collect1 = collect.stream()
+          .flatMap(pair -> edges.stream().filter(edgeDecorator -> edgeDecorator.getSource().equals(pair.getKey()) &&
+              edgeDecorator.getTarget().equals(pair.getValue())
+              ||
+              edgeDecorator.getTarget().equals(pair.getKey()) &&
+                  edgeDecorator.getSource().equals(pair.getValue())
+          ).collect(Collectors.toSet()).stream()).collect(Collectors.toList());
+
+//      graph.removeCells(collect1.stream().map(EdgeDecorator::getEdge).collect(Collectors.toList()).toArray());
+      graph.setCellStyle(Styles.RED.getStyle(), collect1.stream().map(EdgeDecorator::getEdge).toArray());
+    }
 
     //analyze path from each element in shortestPath to start or end
 //    List<Object> shortestPathNodes = shortestPath.stream()
@@ -152,6 +187,20 @@ class MainFrame extends JFrame
 //    {
 //      recursiveSearchRedundantLinks(graph, shortestPathNodes, allEdgesWithoutShortestPath, eg);
 //    });
+  }
+
+  private Set<Pair<Integer, Integer>> recursiveAnalise(int i, Boolean[][] matrix, Set<Integer> shortestPathIndexes,
+      List<Object> allIntersections, mxGraph graph, Set<Pair<Integer, Integer>> collected)
+  {
+    for (int y = 0; y < matrix[i].length; y++)
+    {
+      if (matrix[i][y])
+      {
+        collected.add(new Pair<>(i, y));
+        recursiveAnalise(y, matrix, shortestPathIndexes, allIntersections, graph, collected);
+      }
+    }
+    return collected;
   }
 
 //  private void recursiveSearchRedundantLinks(mxGraph graph, List<Object> shortestPathNodes, List<EdgeDecorator> allEdgesWithoutShortestPath,
