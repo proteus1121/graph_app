@@ -139,11 +139,12 @@ class MainFrame extends JFrame
   {
     Set<EdgeDecorator> connectedLinks = allEdgesWithoutShortestPath.stream()
         .filter(edgeDecorator -> (edgeDecorator.getSource().equals(eg.getSource()) || edgeDecorator.getSource().equals(eg.getTarget())
-            || edgeDecorator.getTarget().equals(eg.getSource()) || edgeDecorator.getTarget().equals(eg.getTarget())))
+            || edgeDecorator.getTarget().equals(eg.getSource()) || edgeDecorator.getTarget().equals(eg.getTarget()))
+            && !eg.equals(edgeDecorator))
         .collect(Collectors.toSet());
 
     List<Object> trueLinks = new ArrayList<>(Sets.union(Sets.union(firstRow, lastRow), shortestPathNodes));
-    Set<Integer> connectedToTruePath = connectedLinks.stream()
+    Set<Integer> connectedToTruePath = result.stream()
         .filter(edgeDecorator -> shortestPathNodes.contains(edgeDecorator.getSource()) || shortestPathNodes.contains(edgeDecorator.getTarget())
             || firstRow.contains(edgeDecorator.getSource()) || firstRow.contains(edgeDecorator.getTarget())
             || lastRow.contains(edgeDecorator.getSource()) || lastRow.contains(edgeDecorator.getTarget()))
@@ -152,19 +153,19 @@ class MainFrame extends JFrame
         .filter(integer -> integer != -1)
         .collect(Collectors.toSet());
 
-    System.out.println("SOSEDI VOT RTOGO PANYA: " + graph.getModel().getValue(eg.getSource()) + " -> " + graph.getModel().getValue(eg.getTarget()));
-    connectedLinks.forEach(edge -> System.out.println(edge.toString(graph)));
-    System.out.println("/SOSEDI");
-
-    if (connectedLinks.size() < 2)
+    if (connectedLinks.size() == 0)
     {
-      if (connectedToTruePath.isEmpty())
+      System.out.println("SOSEDI VOT ETOGO PANYA: " + graph.getModel().getValue(eg.getSource()) + " -> " + graph.getModel().getValue(eg.getTarget()));
+      result.forEach(edge -> System.out.println(edge.toString(graph)));
+      System.out.println("/SOSEDI");
+      if (connectedToTruePath.size() < 2)
       {
         result.forEach(edge -> edge.getEdge().setStyle(Styles.RED.getStyle()));
+        result.clear();
 //              graph.removeCells(result.stream().map(EdgeDecorator::getEdge).collect(Collectors.toList()).toArray());
 
       }
-      else if (connectedToTruePath.size() < 3)
+      else
       {
 //        result.forEach(edge -> edge.getEdge().setStyle(Styles.BLUE.getStyle()));
 //        System.out.println("LEGAL");
@@ -172,15 +173,14 @@ class MainFrame extends JFrame
         result.clear();
       }
     }
-    if (connectedLinks.size() >= 2)
+    else
     {
-      Set<EdgeDecorator> newRes = new HashSet<>();
       result.add(eg);
       allEdgesWithoutShortestPath.remove(eg);
-      connectedLinks.remove(eg);
       connectedLinks.forEach(edgeDecorator ->
       {
-        recursiveSearchRedundantLinks(graph, shortestPathNodes, allEdgesWithoutShortestPath, edgeDecorator, firstRow, lastRow, newRes);
+//        allEdgesWithoutShortestPath.remove(edgeDecorator);
+        recursiveSearchRedundantLinks(graph, shortestPathNodes, allEdgesWithoutShortestPath, edgeDecorator, firstRow, lastRow, result);
       });
     }
   }
@@ -257,7 +257,7 @@ class MainFrame extends JFrame
             y * (CellUtilFactory.HEIGHT + CellUtilFactory.THRESHOLD));
         row.add(cell);
         count.getAndIncrement();
-        System.out.println("Generate points... progress: " + count + "/" + allCount);
+//        System.out.println("Generate points... progress: " + count + "/" + allCount);
       }
     }
   }
@@ -285,7 +285,7 @@ class MainFrame extends JFrame
 // if you want to find min path between points with min path in the all matrix, from left side to right side:
     List<List<Object>> shortestPaths = firstRow.stream().parallel().map(o -> Arrays.asList(lastRow.stream().parallel().map(o2 ->
     {
-      System.out.println("Try to find shortest path... progress: " + count.getAndIncrement() + " / " + allCount);
+//      System.out.println("Try to find shortest path... progress: " + count.getAndIncrement() + " / " + allCount);
       return analysis.getShortestPath(graph, o, o2, null, COUNT_OF_ROWS * COUNT_OF_ELEMENTS_IN_ROW, false);
     }).filter(objects1 -> objects1.length != 0).min(Comparator.comparingInt(o1 -> o1.length)).orElse(new Object[0]))).collect(Collectors.toList());
     return shortestPaths.stream()
