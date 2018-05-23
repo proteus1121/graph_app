@@ -162,17 +162,19 @@ class MainFrame extends JFrame
             ).collect(Collectors.toList()));
           }
       );
-      collect1.forEach(edgeDecorator -> {
-        edgeDecorator.setExit(false);
-        edgeDecorator.setEntry(false);
-      });
+
       Set<EdgeDecorator> fullPath = new HashSet<>();
       collect1.forEach(edgeDecorator -> {
         Set<EdgeDecorator> resultPath = new HashSet<>();
         resultPath.add(edgeDecorator);
         fullPath.addAll(EdgeUtilFactory.getFullLine(edgeDecorator.getSource(), edgeDecorator.getTarget(), collect1, resultPath));
-
       });
+
+      fullPath.forEach(edgeDecorator -> {
+        edgeDecorator.setExit(false);
+        edgeDecorator.setEntry(false);
+      });
+
       boolean isEntry = fullPath.stream()
           .anyMatch(
               edgeDecorator2 -> trueIntersections.contains(edgeDecorator2.getSource()));
@@ -181,8 +183,16 @@ class MainFrame extends JFrame
           .anyMatch(
               edgeDecorator2 -> trueIntersections.contains(edgeDecorator2.getTarget()));
 
-      fullPath.stream().filter(edgeDecorator2 -> !edgeDecorator2.isEntry()).forEach(edgeDecorator2 -> edgeDecorator2.setEntry(isEntry));
-      fullPath.stream().filter(edgeDecorator2 -> !edgeDecorator2.isExit()).forEach(edgeDecorator2 -> edgeDecorator2.setExit(isExit));
+      fullPath.stream().filter(edgeDecorator2 -> !edgeDecorator2.isEntry()).forEach(edgeDecorator2 -> {
+        edgeDecorator2.setEntry(isEntry);
+        if (isEntry)
+          trueIntersections.add(edgeDecorator2.getTarget());
+      });
+      fullPath.stream().filter(edgeDecorator2 -> !edgeDecorator2.isExit()).forEach(edgeDecorator2 -> {
+        edgeDecorator2.setExit(isExit);
+        if (isExit)
+          trueIntersections.add(edgeDecorator2.getSource());
+      });
 
       System.out.println(i + ": " + fullPath.stream().map(edgeDecorator -> edgeDecorator.toString(graph)).collect(Collectors.toList()));
 //      graph.removeCells(collect1.stream().map(EdgeDecorator::getEdge).collect(Collectors.toList()).toArray());
