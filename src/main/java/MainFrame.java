@@ -20,6 +20,8 @@ import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
 class MainFrame extends JFrame
 {
@@ -138,41 +140,53 @@ class MainFrame extends JFrame
 
     Set<Integer> shortestPathIndexes = shortestPathNodes.stream().map(allIntersections::indexOf).collect(Collectors.toSet());
 
+    List<Object> trueIntersections = (Stream.concat(Stream.concat(firstRow.stream(), lastRow.stream()), shortestPathNodes.stream()))
+        .collect(Collectors.toList());
+
     for (int i = 0; i < matrix.length; i++)
     {
       Set<Pair<Integer, Integer>> collected = new HashSet<>();
       collected = recursiveAnalise(i, matrix, shortestPathIndexes, allIntersections, graph, collected);
+      List<EdgeDecorator> collect1 = new ArrayList<>();
+      collected.forEach(o1 ->
+          {
+            Object key = allIntersections.get((int) ((Pair) o1).getKey());
+            Object value = allIntersections.get((int) ((Pair) o1).getValue());
 
-      if (!collected.isEmpty() && collected.stream()
-          .filter(integerIntegerPair -> shortestPathIndexes.contains(integerIntegerPair.getKey()) ||
-              shortestPathIndexes.contains(integerIntegerPair.getValue())).count() > 3
-          ||
-          collected.stream()
-              .anyMatch(integerIntegerPair -> (shortestPathIndexes.contains(integerIntegerPair.getKey()) &&
-                  shortestPathIndexes.contains(integerIntegerPair.getValue())))
-          )
-      {
-        if (!collected.isEmpty())
-          System.out.println("LINKED: " + collected);
-        collected.clear();
-      }
-      if (!collected.isEmpty())
-        System.out.println("DEL: " + collected);
-      List<Pair> collect = collected.stream()
-          .map(integerIntegerPair -> new Pair(allIntersections.get(integerIntegerPair.getKey()), allIntersections.get(integerIntegerPair.getValue())))
-          .collect(
-              Collectors.toList());
+            collect1.addAll(edges.stream().filter(edgeDecorator ->
+                edgeDecorator.getSource().equals(key) &&
+                    edgeDecorator.getTarget().equals(value)
+                    ||
+                    edgeDecorator.getTarget().equals(key) &&
+                        edgeDecorator.getSource().equals(value)
+            ).collect(Collectors.toList()));
+          }
+      );
+      collect1.forEach(edgeDecorator -> {
+        edgeDecorator.setExit(false);
+        edgeDecorator.setEntry(false);
+      });
+      Set<EdgeDecorator> fullPath = new HashSet<>();
+      collect1.forEach(edgeDecorator -> {
+        Set<EdgeDecorator> resultPath = new HashSet<>();
+        resultPath.add(edgeDecorator);
+        fullPath.addAll(EdgeUtilFactory.getFullLine(edgeDecorator.getSource(), edgeDecorator.getTarget(), collect1, resultPath));
 
-      List<EdgeDecorator> collect1 = collect.stream()
-          .flatMap(pair -> edges.stream().filter(edgeDecorator -> edgeDecorator.getSource().equals(pair.getKey()) &&
-              edgeDecorator.getTarget().equals(pair.getValue())
-              ||
-              edgeDecorator.getTarget().equals(pair.getKey()) &&
-                  edgeDecorator.getSource().equals(pair.getValue())
-          ).collect(Collectors.toSet()).stream()).collect(Collectors.toList());
+      });
+      boolean isEntry = fullPath.stream()
+          .anyMatch(
+              edgeDecorator2 -> trueIntersections.contains(edgeDecorator2.getSource()));
 
+      boolean isExit = fullPath.stream()
+          .anyMatch(
+              edgeDecorator2 -> trueIntersections.contains(edgeDecorator2.getTarget()));
+
+      fullPath.stream().filter(edgeDecorator2 -> !edgeDecorator2.isEntry()).forEach(edgeDecorator2 -> edgeDecorator2.setEntry(isEntry));
+      fullPath.stream().filter(edgeDecorator2 -> !edgeDecorator2.isExit()).forEach(edgeDecorator2 -> edgeDecorator2.setExit(isExit));
+
+      System.out.println(i + ": " + fullPath.stream().map(edgeDecorator -> edgeDecorator.toString(graph)).collect(Collectors.toList()));
 //      graph.removeCells(collect1.stream().map(EdgeDecorator::getEdge).collect(Collectors.toList()).toArray());
-      graph.setCellStyle(Styles.RED.getStyle(), collect1.stream().map(EdgeDecorator::getEdge).toArray());
+//      graph.setCellStyle(Styles.RED.getStyle(), collect1.stream().map(EdgeDecorator::getEdge).toArray());
     }
 
     //analyze path from each element in shortestPath to start or end
@@ -194,15 +208,17 @@ class MainFrame extends JFrame
   {
     for (int y = 0; y < matrix[i].length; y++)
     {
-      if (matrix[i][y])
+      Pair<Integer, Integer> pair = new Pair<>(i, y);
+      if (matrix[i][y] && !alredy.contains(pair) && !alredy.contains(new Pair<>(y, i)) && !shortestPathIndexes.contains(i))
       {
-        collected.add(new Pair<>(i, y));
+        collected.add(pair);
         recursiveAnalise(y, matrix, shortestPathIndexes, allIntersections, graph, collected);
       }
     }
     return collected;
   }
 
+  static Set<Pair<Integer, Integer>> alredy = new HashSet<>();
 //  private void recursiveSearchRedundantLinks(mxGraph graph, List<Object> shortestPathNodes, List<EdgeDecorator> allEdgesWithoutShortestPath,
 //      EdgeDecorator eg)
 //  {
