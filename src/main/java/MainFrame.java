@@ -153,6 +153,8 @@ class MainFrame extends JFrame
             Object key = allIntersections.get((int) ((Pair) o1).getKey());
             Object value = allIntersections.get((int) ((Pair) o1).getValue());
 
+            Set<Pair<Integer, Integer>> collected2 = new HashSet<>();
+            collected2 = recursiveAnalise((int) ((Pair) o1).getValue(), matrix, shortestPathIndexes, allIntersections, graph, collected2);
             collect1.addAll(edges.stream().filter(edgeDecorator ->
                 edgeDecorator.getSource().equals(key) &&
                     edgeDecorator.getTarget().equals(value)
@@ -222,7 +224,7 @@ class MainFrame extends JFrame
       if (matrix[i][y] && !alredy.contains(pair) && !alredy.contains(new Pair<>(y, i)) && !shortestPathIndexes.contains(i))
       {
         collected.add(pair);
-        recursiveAnalise(y, matrix, shortestPathIndexes, allIntersections, graph, collected);
+//        recursiveAnalise(y, matrix, shortestPathIndexes, allIntersections, graph, collected);
       }
     }
     return collected;
