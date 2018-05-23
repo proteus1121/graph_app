@@ -129,74 +129,39 @@ class MainFrame extends JFrame
             .anyMatch(edgeDecorator ->
                     edgeDecorator.getSource().equals(allIntersections.get(finalI))
                         && edgeDecorator.getTarget().equals(allIntersections.get(finalY))
-//                    || edgeDecorator.getSource().equals(allIntersections.get(finalY))
-//                    && edgeDecorator.getTarget().equals(allIntersections.get(finalI))
+                    || edgeDecorator.getSource().equals(allIntersections.get(finalY))
+                    && edgeDecorator.getTarget().equals(allIntersections.get(finalI))
             );
-//        System.out.println(matrix[i][y] + " -> " +graph.getModel().getValue(allIntersections.get(i)) + " -> " + graph.getModel().getValue(allIntersections.get(y)));
+        System.out.println(matrix[i][y] ? 1 : 0 + " -> " + graph.getModel().getValue(allIntersections.get(i)) + " -> " + graph.getModel().getValue(allIntersections.get(y)));
       }
     }
     List<Object> shortestPathNodes = shortestPath.stream().flatMap(edgeDecorator -> Sets.newHashSet(edgeDecorator.getSource()
         , edgeDecorator.getTarget()).stream()).collect(Collectors.toList());
 
     Set<Integer> shortestPathIndexes = shortestPathNodes.stream().map(allIntersections::indexOf).collect(Collectors.toSet());
+    Set<Integer> firstRowIndexes = firstRow.stream().map(allIntersections::indexOf).collect(Collectors.toSet());
+    Set<Integer> lastRowIndexes = lastRow.stream().map(allIntersections::indexOf).collect(Collectors.toSet());
+
 
     List<Object> trueIntersections = (Stream.concat(Stream.concat(firstRow.stream(), lastRow.stream()), shortestPathNodes.stream()))
         .collect(Collectors.toList());
 
+    Set<Integer> trueIntersectionsIndexes = (Stream.concat(Stream.concat(firstRowIndexes.stream(), lastRowIndexes.stream()), shortestPathIndexes.stream()))
+        .collect(Collectors.toSet());
+
     for (int i = 0; i < matrix.length; i++)
     {
       Set<Pair<Integer, Integer>> collected = new HashSet<>();
-      collected = recursiveAnalise(i, matrix, shortestPathIndexes, allIntersections, graph, collected);
-      List<EdgeDecorator> collect1 = new ArrayList<>();
-      collected.forEach(o1 ->
-          {
-            Object key = allIntersections.get((int) ((Pair) o1).getKey());
-            Object value = allIntersections.get((int) ((Pair) o1).getValue());
+      collected = recursiveAnalise(i, matrix, trueIntersectionsIndexes, allIntersections, graph, collected, new HashSet<>());
+      System.out.println(i + "LINKED " + collected);
+//      collected.forEach(o1 ->
+//          {
+//            Object key = allIntersections.get((int) ((Pair) o1).getKey());
+//            Object value = allIntersections.get((int) ((Pair) o1).getValue());
+//
+//
+//          }
 
-            Set<Pair<Integer, Integer>> collected2 = new HashSet<>();
-            collected2 = recursiveAnalise((int) ((Pair) o1).getValue(), matrix, shortestPathIndexes, allIntersections, graph, collected2);
-            collect1.addAll(edges.stream().filter(edgeDecorator ->
-                edgeDecorator.getSource().equals(key) &&
-                    edgeDecorator.getTarget().equals(value)
-                    ||
-                    edgeDecorator.getTarget().equals(key) &&
-                        edgeDecorator.getSource().equals(value)
-            ).collect(Collectors.toList()));
-          }
-      );
-
-      Set<EdgeDecorator> fullPath = new HashSet<>();
-      collect1.forEach(edgeDecorator -> {
-        Set<EdgeDecorator> resultPath = new HashSet<>();
-        resultPath.add(edgeDecorator);
-        fullPath.addAll(EdgeUtilFactory.getFullLine(edgeDecorator.getSource(), edgeDecorator.getTarget(), collect1, resultPath));
-      });
-
-      fullPath.forEach(edgeDecorator -> {
-        edgeDecorator.setExit(false);
-        edgeDecorator.setEntry(false);
-      });
-
-      boolean isEntry = fullPath.stream()
-          .anyMatch(
-              edgeDecorator2 -> trueIntersections.contains(edgeDecorator2.getSource()));
-
-      boolean isExit = fullPath.stream()
-          .anyMatch(
-              edgeDecorator2 -> trueIntersections.contains(edgeDecorator2.getTarget()));
-
-      fullPath.stream().filter(edgeDecorator2 -> !edgeDecorator2.isEntry()).forEach(edgeDecorator2 -> {
-        edgeDecorator2.setEntry(isEntry);
-        if (isEntry)
-          trueIntersections.add(edgeDecorator2.getTarget());
-      });
-      fullPath.stream().filter(edgeDecorator2 -> !edgeDecorator2.isExit()).forEach(edgeDecorator2 -> {
-        edgeDecorator2.setExit(isExit);
-        if (isExit)
-          trueIntersections.add(edgeDecorator2.getSource());
-      });
-
-      System.out.println(i + ": " + fullPath.stream().map(edgeDecorator -> edgeDecorator.toString(graph)).collect(Collectors.toList()));
 //      graph.removeCells(collect1.stream().map(EdgeDecorator::getEdge).collect(Collectors.toList()).toArray());
 //      graph.setCellStyle(Styles.RED.getStyle(), collect1.stream().map(EdgeDecorator::getEdge).toArray());
     }
@@ -215,22 +180,27 @@ class MainFrame extends JFrame
 //    });
   }
 
-  private Set<Pair<Integer, Integer>> recursiveAnalise(int i, Boolean[][] matrix, Set<Integer> shortestPathIndexes,
-      List<Object> allIntersections, mxGraph graph, Set<Pair<Integer, Integer>> collected)
+  private Set<Pair<Integer, Integer>> recursiveAnalise(int i, Boolean[][] matrix, Set<Integer> trueIntersectionsIndexes,
+      List<Object> allIntersections, mxGraph graph, Set<Pair<Integer, Integer>> collected, Set<Integer> done)
   {
     for (int y = 0; y < matrix[i].length; y++)
     {
+      long count = Arrays.stream(matrix[i]).filter(aBoolean -> aBoolean).count();
       Pair<Integer, Integer> pair = new Pair<>(i, y);
-      if (matrix[i][y] && !alredy.contains(pair) && !alredy.contains(new Pair<>(y, i)) && !shortestPathIndexes.contains(i))
+      if (matrix[i][y] && !collected.contains(pair) && !collected.contains(new Pair<>(y, i)) && !done.contains(i) && !trueIntersectionsIndexes.contains(y))
       {
         collected.add(pair);
-//        recursiveAnalise(y, matrix, shortestPathIndexes, allIntersections, graph, collected);
+        done.add(i);
+        if(count < 3)
+          recursiveAnalise(y, matrix, trueIntersectionsIndexes, allIntersections, graph, collected, done);
+        else
+        {
+          collected.addAll(recursiveAnalise(y, matrix, trueIntersectionsIndexes, allIntersections, graph, new HashSet<>(), done));
+        }
       }
     }
     return collected;
   }
-
-  static Set<Pair<Integer, Integer>> alredy = new HashSet<>();
 //  private void recursiveSearchRedundantLinks(mxGraph graph, List<Object> shortestPathNodes, List<EdgeDecorator> allEdgesWithoutShortestPath,
 //      EdgeDecorator eg)
 //  {
