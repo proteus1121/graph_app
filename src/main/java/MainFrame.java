@@ -191,12 +191,8 @@ class MainFrame extends JFrame
       {
         collected.add(pair);
         done.add(i);
-        if(count < 3)
+        if(count >= 3)
           recursiveAnalise(y, matrix, trueIntersectionsIndexes, allIntersections, graph, collected, done);
-        else
-        {
-          collected.addAll(recursiveAnalise(y, matrix, trueIntersectionsIndexes, allIntersections, graph, new HashSet<>(), done));
-        }
       }
     }
     return collected;
