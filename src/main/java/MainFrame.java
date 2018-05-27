@@ -116,73 +116,16 @@ class MainFrame extends JFrame
     Set<Object> shortestPathNodes = shortestPath.stream()
         .flatMap(edgeDecorator -> Sets.newHashSet(edgeDecorator.getSource(), edgeDecorator.getTarget()).stream())
         .collect(Collectors.toSet());
+    List<Object> trueNodes = new ArrayList<>(Sets.union(Sets.union(new HashSet<>(firstRow), new HashSet<>(lastRow)), shortestPathNodes));
+    List<EdgeDecorator> trueLinks = new ArrayList<>();
+    trueNodes.forEach(o1 ->
+        trueNodes.forEach(o2 -> trueLinks
+            .addAll(edges.stream().filter(edgeDecorator -> Arrays.asList(graph.addAllEdges(Lists.newArrayList(o1, o2).toArray() )).contains(edgeDecorator))
+                .collect(Collectors.toSet())
+            )));
 
-    List<EdgeDecorator> allEdgesWithoutShortestPath = new ArrayList<>(edges);
-    allEdgesWithoutShortestPath.removeAll(shortestPath);
-
-    List<EdgeDecorator> allEdgesWithoutShortestPathCopy = new ArrayList<>(allEdgesWithoutShortestPath);
-    allEdgesWithoutShortestPathCopy.forEach(eg ->
-    {
-      Set<EdgeDecorator> result = new HashSet<>();
-      recursiveSearchRedundantLinks(graph,
-          shortestPathNodes,
-          allEdgesWithoutShortestPath,
-          eg,
-          new HashSet<>(firstRow),
-          new HashSet<>(lastRow),
-          result);
-    });
-  }
-
-  private void recursiveSearchRedundantLinks(mxGraph graph, Set<Object> shortestPathNodes, List<EdgeDecorator> allEdgesWithoutShortestPath,
-      EdgeDecorator eg, Set<Object> firstRow, Set<Object> lastRow, Set<EdgeDecorator> result)
-  {
-    Set<EdgeDecorator> connectedLinks = allEdgesWithoutShortestPath.stream()
-        .filter(edgeDecorator -> (edgeDecorator.getSource().equals(eg.getSource()) || edgeDecorator.getSource().equals(eg.getTarget())
-            || edgeDecorator.getTarget().equals(eg.getSource()) || edgeDecorator.getTarget().equals(eg.getTarget()))
-            && !eg.equals(edgeDecorator))
-        .collect(Collectors.toSet());
-
-    List<Object> trueLinks = new ArrayList<>(Sets.union(Sets.union(firstRow, lastRow), shortestPathNodes));
-    Set<Integer> connectedToTruePath = result.stream()
-        .filter(edgeDecorator -> shortestPathNodes.contains(edgeDecorator.getSource()) || shortestPathNodes.contains(edgeDecorator.getTarget())
-            || firstRow.contains(edgeDecorator.getSource()) || firstRow.contains(edgeDecorator.getTarget())
-            || lastRow.contains(edgeDecorator.getSource()) || lastRow.contains(edgeDecorator.getTarget()))
-        .flatMap(edgeDecorator -> Sets.newHashSet(edgeDecorator.getSource(), edgeDecorator.getTarget()).stream())
-        .map(trueLinks::indexOf)
-        .filter(integer -> integer != -1)
-        .collect(Collectors.toSet());
-
-    if (connectedLinks.size() == 0)
-    {
-      System.out.println("SOSEDI VOT ETOGO PANYA: " + graph.getModel().getValue(eg.getSource()) + " -> " + graph.getModel().getValue(eg.getTarget()));
-      result.forEach(edge -> System.out.println(edge.toString(graph)));
-      System.out.println("/SOSEDI");
-      if (connectedToTruePath.size() < 2)
-      {
-        result.forEach(edge -> edge.getEdge().setStyle(Styles.RED.getStyle()));
-        result.clear();
-//              graph.removeCells(result.stream().map(EdgeDecorator::getEdge).collect(Collectors.toList()).toArray());
-
-      }
-      else
-      {
-//        result.forEach(edge -> edge.getEdge().setStyle(Styles.BLUE.getStyle()));
-//        System.out.println("LEGAL");
-//        result.forEach(edge -> System.out.println(edge.toString(graph)));
-        result.clear();
-      }
-    }
-    else
-    {
-      result.add(eg);
-      allEdgesWithoutShortestPath.remove(eg);
-      connectedLinks.forEach(edgeDecorator ->
-      {
-//        allEdgesWithoutShortestPath.remove(edgeDecorator);
-        recursiveSearchRedundantLinks(graph, shortestPathNodes, allEdgesWithoutShortestPath, edgeDecorator, firstRow, lastRow, result);
-      });
-    }
+    Set<EdgeDecorator> collect = edges.stream().filter(e -> !trueLinks.contains(e)).collect(Collectors.toSet());
+    collect.forEach(edge -> edge.getEdge().setStyle(Styles.RED.getStyle()));
   }
 
   private void generateLinks(mxGraph graph, Object parent, List<Object> firstRow, List<Object> lastRow)
