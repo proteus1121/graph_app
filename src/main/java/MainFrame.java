@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Random;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
@@ -75,7 +76,20 @@ class MainFrame extends JFrame
       graph.setCellStyle(Styles.GREEN.getStyle(), shortestPath.stream().map(EdgeDecorator::getTarget).toArray());
 
       //remove second dangling links
-      removeSecondDanglingLinks(graph, shortestPath, firstRow, lastRow);
+      Set<Object> shortestPathNodes = shortestPath.stream()
+          .flatMap(edgeDecorator -> Sets.newHashSet(edgeDecorator.getSource(), edgeDecorator.getTarget()).stream())
+          .collect(Collectors.toSet());
+      List<Object> trueNodes = new ArrayList<>(Sets.union(Sets.union(new HashSet<>(firstRow), new HashSet<>(lastRow)), shortestPathNodes));
+
+      List<EdgeDecorator> trueLinks = new ArrayList<>(shortestPath);
+      graph.removeCells(shortestPath.stream().map(EdgeDecorator::getEdge).toArray());
+      removeSecondDanglingLinks(graph, trueNodes, trueLinks);
+
+      Set<EdgeDecorator> collect = edges.stream().filter(e -> !trueLinks.contains(e)).collect(Collectors.toSet());
+      collect.forEach(edge -> edge.getEdge().setStyle(Styles.RED.getStyle()));
+
+      Set<EdgeDecorator> collect2 = edges.stream().filter(trueLinks::contains).collect(Collectors.toSet());
+      collect2.forEach(edge -> graph.insertEdge(parent, null, "", edge.getSource(), edge.getTarget(), Styles.BLUE.getStyle()));
 
     }
     finally
@@ -110,22 +124,32 @@ class MainFrame extends JFrame
     edges.removeAll(edgeDecoratorsForDelete);
   }
 
-  private void removeSecondDanglingLinks(mxGraph graph, List<EdgeDecorator> shortestPath, List<Object> firstRow, List<Object> lastRow)
+  private void removeSecondDanglingLinks(mxGraph graph, List<Object> trueNodes, List<EdgeDecorator> trueLinks)
   {
     //analyze path from each element in shortestPath to start or end
-    Set<Object> shortestPathNodes = shortestPath.stream()
-        .flatMap(edgeDecorator -> Sets.newHashSet(edgeDecorator.getSource(), edgeDecorator.getTarget()).stream())
-        .collect(Collectors.toSet());
-    List<Object> trueNodes = new ArrayList<>(Sets.union(Sets.union(new HashSet<>(firstRow), new HashSet<>(lastRow)), shortestPathNodes));
-    List<EdgeDecorator> trueLinks = new ArrayList<>();
-    trueNodes.forEach(o1 ->
-        trueNodes.forEach(o2 -> trueLinks
-            .addAll(edges.stream().filter(edgeDecorator -> Arrays.asList(graph.addAllEdges(Lists.newArrayList(o1, o2).toArray() )).contains(edgeDecorator))
-                .collect(Collectors.toSet())
-            )));
+    AtomicBoolean haveAlternativePath = new AtomicBoolean(false);
 
-    Set<EdgeDecorator> collect = edges.stream().filter(e -> !trueLinks.contains(e)).collect(Collectors.toSet());
-    collect.forEach(edge -> edge.getEdge().setStyle(Styles.RED.getStyle()));
+    List<EdgeDecorator> localTrueLinks = new ArrayList<>();
+    trueNodes.forEach(o1 ->
+        trueNodes.forEach(o2 -> {
+          List<Object> objects = Arrays.asList(mxGraphAnalysis.getInstance().getShortestPath(graph, o1, o2, null, trueNodes.size(), false));
+          if(!objects.isEmpty())
+          {
+            haveAlternativePath.set(true);
+            objects.forEach(o -> localTrueLinks
+                .addAll(edges.stream().filter(edgeDecorator -> edgeDecorator.getEdge().equals(o)).collect(Collectors.toSet())));
+          }
+
+        }));
+    if(!localTrueLinks.isEmpty())
+    {
+      Set<EdgeDecorator> collect = edges.stream().filter(localTrueLinks::contains).collect(Collectors.toSet());
+      graph.removeCells(collect.stream().map(EdgeDecorator::getEdge).toArray());
+      trueLinks.addAll(localTrueLinks);
+    }
+    if (haveAlternativePath.get()){
+      removeSecondDanglingLinks(graph, trueNodes, trueLinks);
+    }
   }
 
   private void generateLinks(mxGraph graph, Object parent, List<Object> firstRow, List<Object> lastRow)
