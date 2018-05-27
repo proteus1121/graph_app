@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Random;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
@@ -75,7 +76,20 @@ class MainFrame extends JFrame
       graph.setCellStyle(Styles.GREEN.getStyle(), shortestPath.stream().map(EdgeDecorator::getTarget).toArray());
 
       //remove second dangling links
-      removeSecondDanglingLinks(graph, shortestPath, firstRow, lastRow);
+      Set<Object> shortestPathNodes = shortestPath.stream()
+          .flatMap(edgeDecorator -> Sets.newHashSet(edgeDecorator.getSource(), edgeDecorator.getTarget()).stream())
+          .collect(Collectors.toSet());
+      List<Object> trueNodes = new ArrayList<>(Sets.union(Sets.union(new HashSet<>(firstRow), new HashSet<>(lastRow)), shortestPathNodes));
+
+      List<EdgeDecorator> trueLinks = new ArrayList<>(shortestPath);
+      graph.removeCells(shortestPath.stream().map(EdgeDecorator::getEdge).toArray());
+      removeSecondDanglingLinks(graph, trueNodes, trueLinks);
+
+      Set<EdgeDecorator> collect = edges.stream().filter(e -> !trueLinks.contains(e)).collect(Collectors.toSet());
+      collect.forEach(edge -> edge.getEdge().setStyle(Styles.RED.getStyle()));
+
+      Set<EdgeDecorator> collect2 = edges.stream().filter(trueLinks::contains).collect(Collectors.toSet());
+      collect2.forEach(edge -> graph.insertEdge(parent, null, "", edge.getSource(), edge.getTarget(), Styles.BLUE.getStyle()));
 
     }
     finally
@@ -110,66 +124,31 @@ class MainFrame extends JFrame
     edges.removeAll(edgeDecoratorsForDelete);
   }
 
-  private void removeSecondDanglingLinks(mxGraph graph, List<EdgeDecorator> shortestPath, List<Object> firstRow, List<Object> lastRow)
+  private void removeSecondDanglingLinks(mxGraph graph, List<Object> trueNodes, List<EdgeDecorator> trueLinks)
   {
     //analyze path from each element in shortestPath to start or end
-    List<Object> shortestPathNodes = shortestPath.stream().flatMap(edgeDecorator -> Sets.newHashSet(edgeDecorator.getSource()
-        , edgeDecorator.getTarget()).stream()).collect(Collectors.toList());
+    AtomicBoolean haveAlternativePath = new AtomicBoolean(false);
 
-    List<EdgeDecorator> allEdgesWithoutShortestPath = new ArrayList<>(edges);
-    allEdgesWithoutShortestPath.removeAll(shortestPath);
+    List<EdgeDecorator> localTrueLinks = new ArrayList<>();
+    trueNodes.forEach(o1 ->
+        trueNodes.forEach(o2 -> {
+          List<Object> objects = Arrays.asList(mxGraphAnalysis.getInstance().getShortestPath(graph, o1, o2, null, trueNodes.size(), false));
+          if(!objects.isEmpty())
+          {
+            haveAlternativePath.set(true);
+            objects.forEach(o -> localTrueLinks
+                .addAll(edges.stream().filter(edgeDecorator -> edgeDecorator.getEdge().equals(o)).collect(Collectors.toSet())));
+          }
 
-    List<EdgeDecorator> allEdgesWithoutShortestPathCopy = new ArrayList<>(allEdgesWithoutShortestPath);
-    allEdgesWithoutShortestPathCopy.forEach(eg ->
+        }));
+    if(!localTrueLinks.isEmpty())
     {
-      Set<EdgeDecorator> result = new HashSet<>();
-      result.add(eg);
-      recursiveSearchRedundantLinks(graph, shortestPathNodes, allEdgesWithoutShortestPath, eg, result);
-    });
-  }
-
-  private void recursiveSearchRedundantLinks(mxGraph graph, List<Object> shortestPathNodes,
-      List<EdgeDecorator> allEdgesWithoutShortestPath, EdgeDecorator eg,
-      Set<EdgeDecorator> result)
-  {
-    Set<EdgeDecorator> connectedLinks = allEdgesWithoutShortestPath.stream().filter(edgeDecorator -> (edgeDecorator.getSource().equals(eg.getSource())
-        || edgeDecorator.getSource().equals(eg.getTarget())
-        || edgeDecorator.getTarget().equals(eg.getSource())
-        || edgeDecorator.getTarget().equals(eg.getTarget())) && !edgeDecorator.getEdge().equals(eg.getEdge())
-    ).collect(Collectors.toSet());
-
-    Set<Integer> connectedToShortPath = connectedLinks.stream()
-        .filter(edgeDecorator -> shortestPathNodes.contains(edgeDecorator.getSource()) ||
-            shortestPathNodes.contains(edgeDecorator.getTarget()))
-        .flatMap(edgeDecorator -> Sets.newHashSet(edgeDecorator.getSource(), edgeDecorator.getTarget()).stream())
-        .map(shortestPathNodes::indexOf)
-        .collect(Collectors.toSet());
-
-    if (connectedLinks.size() < 2)
-    {
-      if (connectedToShortPath.size() > 3)
-      {
-        result.forEach(edge -> edge.getEdge().setStyle(Styles.BLUE.getStyle()));
-        System.out.println("LEGAL");
-        result.forEach(edge -> System.out.println(edge.toString(graph)));
-        result.clear();
-      }
-      else
-      {
-        System.out.println("DEL");
-        result.forEach(edge -> System.out.println(edge.toString(graph)));
-        result.forEach(edge -> edge.getEdge().setStyle(Styles.RED.getStyle()));
-//              graph.removeCells(result.stream().map(EdgeDecorator::getEdge).collect(Collectors.toList()).toArray());
-
-      }
+      Set<EdgeDecorator> collect = edges.stream().filter(localTrueLinks::contains).collect(Collectors.toSet());
+      graph.removeCells(collect.stream().map(EdgeDecorator::getEdge).toArray());
+      trueLinks.addAll(localTrueLinks);
     }
-    if (connectedLinks.size() > 3)
-    {
-      result.add(eg);
-      allEdgesWithoutShortestPath.remove(eg);
-      connectedLinks.forEach(edgeDecorator -> {
-        recursiveSearchRedundantLinks(graph, shortestPathNodes, allEdgesWithoutShortestPath, edgeDecorator, result);
-      });
+    if (haveAlternativePath.get()){
+      removeSecondDanglingLinks(graph, trueNodes, trueLinks);
     }
   }
 
@@ -245,7 +224,7 @@ class MainFrame extends JFrame
             y * (CellUtilFactory.HEIGHT + CellUtilFactory.THRESHOLD));
         row.add(cell);
         count.getAndIncrement();
-        System.out.println("Generate points... progress: " + count + "/" + allCount);
+//        System.out.println("Generate points... progress: " + count + "/" + allCount);
       }
     }
   }
@@ -273,7 +252,7 @@ class MainFrame extends JFrame
 // if you want to find min path between points with min path in the all matrix, from left side to right side:
     List<List<Object>> shortestPaths = firstRow.stream().parallel().map(o -> Arrays.asList(lastRow.stream().parallel().map(o2 ->
     {
-      System.out.println("Try to find shortest path... progress: " + count.getAndIncrement() + " / " + allCount);
+//      System.out.println("Try to find shortest path... progress: " + count.getAndIncrement() + " / " + allCount);
       return analysis.getShortestPath(graph, o, o2, null, COUNT_OF_ROWS * COUNT_OF_ELEMENTS_IN_ROW, false);
     }).filter(objects1 -> objects1.length != 0).min(Comparator.comparingInt(o1 -> o1.length)).orElse(new Object[0]))).collect(Collectors.toList());
     return shortestPaths.stream()
