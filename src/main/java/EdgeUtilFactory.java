@@ -21,7 +21,7 @@ public class EdgeUtilFactory
     edges.add(currentEdge);
     Set<EdgeDecorator> fullPath = getFullLine(intersection, neighboringIntersection, edges, resultPath);
 
-    boolean isEntry = fullPath.stream()
+    boolean isEntry = fullPath.parallelStream()
         .anyMatch(
             edgeDecorator -> firstRow.contains(edgeDecorator.getSource()) || firstRow.contains(edgeDecorator.getTarget()) || edgeDecorator.isEntry()
                 || firstRow.contains(intersection) || firstRow.contains(neighboringIntersection));
@@ -31,8 +31,8 @@ public class EdgeUtilFactory
             edgeDecorator -> lastRow.contains(edgeDecorator.getSource()) || lastRow.contains(edgeDecorator.getTarget()) || edgeDecorator.isExit()
                 || lastRow.contains(intersection) || lastRow.contains(neighboringIntersection));
 
-    fullPath.stream().filter(edgeDecorator -> !edgeDecorator.isEntry()).forEach(edgeDecorator -> edgeDecorator.setEntry(isEntry));
-    fullPath.stream().filter(edgeDecorator -> !edgeDecorator.isExit()).forEach(edgeDecorator -> edgeDecorator.setExit(isExit));
+    fullPath.parallelStream().filter(edgeDecorator -> !edgeDecorator.isEntry()).forEach(edgeDecorator -> edgeDecorator.setEntry(isEntry));
+    fullPath.parallelStream().filter(edgeDecorator -> !edgeDecorator.isExit()).forEach(edgeDecorator -> edgeDecorator.setExit(isExit));
 
     currentEdge.setEntry(isEntry);
     currentEdge.setExit(isExit);
@@ -45,7 +45,7 @@ public class EdgeUtilFactory
       Set<EdgeDecorator> resultEdges)
   {
     Set<EdgeDecorator> newResult = new HashSet<>(resultEdges);
-    Set<EdgeDecorator> connectedEdges = edges.stream()
+    Set<EdgeDecorator> connectedEdges = edges.parallelStream()
         .filter(edgeDecorator -> edgeDecorator.getSource().equals(intersection) || edgeDecorator.getTarget().equals(intersection)
             || edgeDecorator.getSource().equals(neighboringIntersection) || edgeDecorator.getTarget().equals(neighboringIntersection))
         .filter(edgeDecorator -> !edgeDecorator.getSource().equals(intersection) && !edgeDecorator.getTarget().equals(neighboringIntersection))

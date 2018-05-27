@@ -22,7 +22,6 @@ import java.util.stream.Collectors;
 
 class MainFrame extends JFrame
 {
-
   private static final int COUNT_OF_ROWS = 10;
   private static final int COUNT_OF_ELEMENTS_IN_ROW = 10;
   private List<List<Object>> objects = new ArrayList<>();
@@ -86,7 +85,8 @@ class MainFrame extends JFrame
       removeSecondDanglingLinks(graph, trueNodes, trueLinks);
 
       Set<EdgeDecorator> collect = edges.stream().filter(e -> !trueLinks.contains(e)).collect(Collectors.toSet());
-      collect.forEach(edge -> edge.getEdge().setStyle(Styles.RED.getStyle()));
+//      collect.forEach(edge -> edge.getEdge().setStyle(Styles.RED.getStyle()));v
+      graph.removeCells(collect.stream().map(EdgeDecorator::getEdge).toArray());
 
       Set<EdgeDecorator> collect2 = edges.stream().filter(trueLinks::contains).collect(Collectors.toSet());
       collect2.forEach(edge -> graph.insertEdge(parent, null, "", edge.getSource(), edge.getTarget(), Styles.BLUE.getStyle()));
@@ -133,7 +133,7 @@ class MainFrame extends JFrame
     trueNodes.forEach(o1 ->
         trueNodes.forEach(o2 -> {
           List<Object> objects = Arrays.asList(mxGraphAnalysis.getInstance().getShortestPath(graph, o1, o2, null, trueNodes.size(), false));
-          if(!objects.isEmpty())
+          if (!objects.isEmpty())
           {
             haveAlternativePath.set(true);
             objects.forEach(o -> localTrueLinks
@@ -141,27 +141,27 @@ class MainFrame extends JFrame
           }
 
         }));
-    if(!localTrueLinks.isEmpty())
+    if (!localTrueLinks.isEmpty())
     {
       Set<EdgeDecorator> collect = edges.stream().filter(localTrueLinks::contains).collect(Collectors.toSet());
       graph.removeCells(collect.stream().map(EdgeDecorator::getEdge).toArray());
       trueLinks.addAll(localTrueLinks);
     }
-    if (haveAlternativePath.get()){
+    if (haveAlternativePath.get())
+    {
       removeSecondDanglingLinks(graph, trueNodes, trueLinks);
     }
   }
 
+  static final AtomicBoolean isLinked = new AtomicBoolean(false);
+
   private void generateLinks(mxGraph graph, Object parent, List<Object> firstRow, List<Object> lastRow)
   {
     AtomicInteger count = new AtomicInteger(0);
-    List<Thread> threads = new ArrayList<>();
     int iterationCount = ((COUNT_OF_ROWS - 1) * COUNT_OF_ELEMENTS_IN_ROW + (COUNT_OF_ELEMENTS_IN_ROW - 1) * COUNT_OF_ROWS) - (2 * (
         COUNT_OF_ELEMENTS_IN_ROW - 1));
     while (count.get() < iterationCount)
     {
-//            Thread t = new Thread(() ->
-//            {
       Random rand = new Random();
       int numberOfRow = rand.nextInt(COUNT_OF_ROWS);
       int numberOfElement = rand.nextInt(COUNT_OF_ELEMENTS_IN_ROW);
@@ -170,41 +170,22 @@ class MainFrame extends JFrame
       int direction = rand.nextInt(3);
       Object neighboringIntersection = getNeighboringIntersection(numberOfRow, numberOfElement, direction);
 
-      if (!neighboringIntersection.equals(intersection) && edges.stream()
+      if (!neighboringIntersection.equals(intersection) && edges.parallelStream()
           .noneMatch(edge -> edge.getSource().equals(intersection) && edge.getTarget().equals(neighboringIntersection)
               || edge.getSource().equals(neighboringIntersection) && edge.getTarget().equals(intersection)) && !(firstRow.contains(intersection)
           && firstRow.contains(neighboringIntersection)) && !(lastRow.contains(intersection) && lastRow.contains(neighboringIntersection)))
       {
-        synchronized (edges)
-        {
-          EdgeDecorator edge = EdgeUtilFactory.createEdge(graph, parent, intersection, neighboringIntersection, firstRow, lastRow, edges);
+        EdgeDecorator edge = EdgeUtilFactory.createEdge(graph, parent, intersection, neighboringIntersection, firstRow, lastRow, edges);
 
-          edges.add(edge);
-          count.getAndIncrement();
-          if (edge.isEntry() && edge.isExit())
-          {
-            break;
-          }
+        edges.add(edge);
+        count.getAndIncrement();
+        if (edge.isEntry() && edge.isExit())
+        {
+          break;
         }
       }
-//            });
-//            threads.add(t);
-//            t.start();
-//      System.out.println("Generate random edges... progress: " + count.get() + "/" + iterationCount);
+      System.out.println("Generate random edges... progress: " + count.get() + "/" + iterationCount);
     }
-
-    threads.forEach(thread ->
-    {
-      try
-      {
-        thread.join();
-      }
-      catch (InterruptedException e)
-      {
-        e.printStackTrace();
-      }
-    });
-    threads.clear();
   }
 
   private void generatePoints(mxGraph graph, Object parent)
@@ -224,7 +205,7 @@ class MainFrame extends JFrame
             y * (CellUtilFactory.HEIGHT + CellUtilFactory.THRESHOLD));
         row.add(cell);
         count.getAndIncrement();
-//        System.out.println("Generate points... progress: " + count + "/" + allCount);
+        System.out.println("Generate points... progress: " + count + "/" + allCount);
       }
     }
   }
@@ -250,18 +231,18 @@ class MainFrame extends JFrame
 //        .orElse(new Object[0]);
 
 // if you want to find min path between points with min path in the all matrix, from left side to right side:
-    List<List<Object>> shortestPaths = firstRow.stream().parallel().map(o -> Arrays.asList(lastRow.stream().parallel().map(o2 ->
+    List<List<Object>> shortestPaths = firstRow.parallelStream().parallel().map(o -> Arrays.asList(lastRow.parallelStream().parallel().map(o2 ->
     {
-//      System.out.println("Try to find shortest path... progress: " + count.getAndIncrement() + " / " + allCount);
+      System.out.println("Try to find shortest path... progress: " + count.getAndIncrement() + " / " + allCount);
       return analysis.getShortestPath(graph, o, o2, null, COUNT_OF_ROWS * COUNT_OF_ELEMENTS_IN_ROW, false);
     }).filter(objects1 -> objects1.length != 0).min(Comparator.comparingInt(o1 -> o1.length)).orElse(new Object[0]))).collect(Collectors.toList());
-    return shortestPaths.stream()
+    return shortestPaths.parallelStream()
         .filter(shortestPath -> shortestPath.size() != 0)
         .parallel()
         .min(Comparator.comparingInt(List::size))
         .orElse(Lists.newArrayList())
-        .stream()
-        .map(edge -> edges.stream().filter(edgeDecorator -> edgeDecorator.getEdge().equals(edge)).findAny())
+        .parallelStream()
+        .map(edge -> edges.parallelStream().filter(edgeDecorator -> edgeDecorator.getEdge().equals(edge)).findAny())
         .filter(Optional::isPresent)
         .map(Optional::get)
         .collect(Collectors.toList());
