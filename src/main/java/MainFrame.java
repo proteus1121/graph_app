@@ -10,6 +10,7 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
@@ -24,6 +25,7 @@ class MainFrame extends JFrame
 {
   private static final int COUNT_OF_ROWS = 10;
   private static final int COUNT_OF_ELEMENTS_IN_ROW = 10;
+  private static double resistance = 0;
   private List<List<Object>> objects = new ArrayList<>();
   private final List<EdgeDecorator> edges = new ArrayList<>();
 
@@ -80,17 +82,21 @@ class MainFrame extends JFrame
           .collect(Collectors.toSet());
       List<Object> trueNodes = new ArrayList<>(Sets.union(Sets.union(new HashSet<>(firstRow), new HashSet<>(lastRow)), shortestPathNodes));
 
-      List<EdgeDecorator> trueLinks = new ArrayList<>(shortestPath);
+      List<List<EdgeDecorator>> truePathLinks = new ArrayList<>();
+      truePathLinks.add(shortestPath);
       graph.removeCells(shortestPath.stream().map(EdgeDecorator::getEdge).toArray());
-      removeSecondDanglingLinks(graph, trueNodes, trueLinks);
+      removeSecondDanglingLinks(graph, trueNodes, truePathLinks);
 
-      Set<EdgeDecorator> collect = edges.stream().filter(e -> !trueLinks.contains(e)).collect(Collectors.toSet());
-//      collect.forEach(edge -> edge.getEdge().setStyle(Styles.RED.getStyle()));v
-      graph.removeCells(collect.stream().map(EdgeDecorator::getEdge).toArray());
+      List<EdgeDecorator> trueLinks = truePathLinks.stream().flatMap(Collection::stream).collect(Collectors.toList());
 
-      Set<EdgeDecorator> collect2 = edges.stream().filter(trueLinks::contains).collect(Collectors.toSet());
-      collect2.forEach(edge -> graph.insertEdge(parent, null, "", edge.getSource(), edge.getTarget(), Styles.BLUE.getStyle()));
+      Set<EdgeDecorator> danglingLinks = edges.stream().filter(e -> !trueLinks.contains(e)).collect(Collectors.toSet());
+//      danglingLinks.forEach(edge -> edge.getEdge().setStyle(Styles.RED.getStyle()));
+      graph.removeCells(danglingLinks.stream().map(EdgeDecorator::getEdge).toArray());
 
+      Set<EdgeDecorator> trueLinksForRestore = edges.stream().filter(trueLinks::contains).collect(Collectors.toSet());
+      trueLinksForRestore.forEach(edge -> graph.insertEdge(parent, null, "", edge.getSource(), edge.getTarget(), Styles.BLUE.getStyle()));
+
+      double resistance = calcResistance(truePathLinks);
     }
     finally
     {
@@ -115,6 +121,12 @@ class MainFrame extends JFrame
     });
   }
 
+  private double calcResistance(List<List<EdgeDecorator>> links)
+  {
+    links.forEach(edgeDecoratorsList -> edgeDecoratorsList.);
+    return 0;
+  }
+
   private void removeFirstDanglingLinks(mxGraph graph)
   {
     List<EdgeDecorator> edgeDecoratorsForDelete = edges.parallelStream()
@@ -124,7 +136,7 @@ class MainFrame extends JFrame
     edges.removeAll(edgeDecoratorsForDelete);
   }
 
-  private void removeSecondDanglingLinks(mxGraph graph, List<Object> trueNodes, List<EdgeDecorator> trueLinks)
+  private void removeSecondDanglingLinks(mxGraph graph, List<Object> trueNodes, List<List<EdgeDecorator>> trueLinks)
   {
     //analyze path from each element in shortestPath to start or end
     AtomicBoolean haveAlternativePath = new AtomicBoolean(false);
@@ -139,21 +151,18 @@ class MainFrame extends JFrame
             objects.forEach(o -> localTrueLinks
                 .addAll(edges.stream().filter(edgeDecorator -> edgeDecorator.getEdge().equals(o)).collect(Collectors.toSet())));
           }
-
         }));
     if (!localTrueLinks.isEmpty())
     {
       Set<EdgeDecorator> collect = edges.stream().filter(localTrueLinks::contains).collect(Collectors.toSet());
       graph.removeCells(collect.stream().map(EdgeDecorator::getEdge).toArray());
-      trueLinks.addAll(localTrueLinks);
+      trueLinks.add(localTrueLinks);
     }
     if (haveAlternativePath.get())
     {
       removeSecondDanglingLinks(graph, trueNodes, trueLinks);
     }
   }
-
-  static final AtomicBoolean isLinked = new AtomicBoolean(false);
 
   private void generateLinks(mxGraph graph, Object parent, List<Object> firstRow, List<Object> lastRow)
   {
