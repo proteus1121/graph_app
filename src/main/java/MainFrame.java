@@ -94,9 +94,12 @@ class MainFrame extends JFrame
       graph.removeCells(danglingLinks.stream().map(EdgeDecorator::getEdge).toArray());
 
       Set<EdgeDecorator> trueLinksForRestore = edges.stream().filter(trueLinks::contains).collect(Collectors.toSet());
-      trueLinksForRestore.forEach(edge -> graph.insertEdge(parent, null, "", edge.getSource(), edge.getTarget(), Styles.BLUE.getStyle()));
 
-      double resistance = calcResistance(truePathLinks);
+      trueLinksForRestore.forEach(edge -> edges.add(EdgeUtilFactory.createEdge(graph, parent, edge.getSource(), edge.getTarget(), firstRow, lastRow, edges)));
+
+      double resistance = calcResistance(truePathLinks, shortestPath, graph);
+      System.err.println("resistance: " + resistance);
+
     }
     finally
     {
@@ -121,10 +124,46 @@ class MainFrame extends JFrame
     });
   }
 
-  private double calcResistance(List<List<EdgeDecorator>> links)
+  private double calcResistance(List<List<EdgeDecorator>> links, List<EdgeDecorator> shortestPath, mxGraph graph)
   {
-    links.forEach(edgeDecoratorsList -> edgeDecoratorsList.);
-    return 0;
+    links.remove(shortestPath);
+    List<List<List<EdgeDecorator>>> newLinksBig = new ArrayList<>();
+
+    links.forEach(edgeDecoratorsList -> {
+      List<List<EdgeDecorator>> newLinks = new ArrayList<>();
+
+      EdgeDecorator firstEdge = edgeDecoratorsList.get(0);
+      EdgeDecorator lastEdge = edgeDecoratorsList.get(edgeDecoratorsList.size() - 1);
+      List<Object> objects = Arrays.asList(mxGraphAnalysis.getInstance()
+          .getShortestPath(graph, firstEdge.getSource(), lastEdge.getTarget(), null, 999,
+              false));
+
+      if (!objects.isEmpty())
+      {
+        List<EdgeDecorator> collect = objects.stream().flatMap(o ->
+            edges.stream().filter(edgeDecorator -> edgeDecorator.getEdge().equals(o)).collect(Collectors.toSet()).stream())
+            .collect(Collectors.toList());
+        newLinks.add(collect);
+      }
+//      List<List<EdgeDecorator>> collect = links.stream().filter(edgeDecorators -> edgeDecorators.get(0).getSource().equals(firstEdge.getSource())
+//          && edgeDecorators.get(edgeDecorators.size() - 1).getTarget().equals(firstEdge.getTarget())).collect(Collectors.toList());
+//      newLinks.addAll(collect);
+      newLinks.add(edgeDecoratorsList);
+      newLinksBig.add(newLinks);
+    });
+    return newLinksBig.stream().map(lists -> calcParallel(lists.stream().map(List::size).map(Integer::doubleValue).collect(Collectors.toList())))
+        .reduce((aDouble, aDouble2) -> aDouble + aDouble2).orElse(0d);
+  }
+
+  public static double calcParallel(List<Double> collect)
+  {
+    double result = 0d;
+    for (Double aDouble : collect)
+    {
+      result = result + (1d / aDouble);
+    }
+    double v = 1d / result;
+    return v;
   }
 
   private void removeFirstDanglingLinks(mxGraph graph)
@@ -148,15 +187,17 @@ class MainFrame extends JFrame
           if (!objects.isEmpty())
           {
             haveAlternativePath.set(true);
-            objects.forEach(o -> localTrueLinks
-                .addAll(edges.stream().filter(edgeDecorator -> edgeDecorator.getEdge().equals(o)).collect(Collectors.toSet())));
+            Set<EdgeDecorator> collect = objects.stream().flatMap(o ->
+                edges.stream().filter(edgeDecorator -> edgeDecorator.getEdge().equals(o)).collect(Collectors.toSet()).stream())
+                .collect(Collectors.toSet());
+            localTrueLinks.addAll(collect);
+            trueLinks.add(new ArrayList<>(collect));
           }
         }));
     if (!localTrueLinks.isEmpty())
     {
       Set<EdgeDecorator> collect = edges.stream().filter(localTrueLinks::contains).collect(Collectors.toSet());
       graph.removeCells(collect.stream().map(EdgeDecorator::getEdge).toArray());
-      trueLinks.add(localTrueLinks);
     }
     if (haveAlternativePath.get())
     {
